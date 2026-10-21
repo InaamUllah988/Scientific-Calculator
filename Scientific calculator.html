@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scientific Calculator</title>
+<style>
+  :root { --ink: #4a3b5c; }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+
+  body {
+    display: grid;
+    place-items: center;
+    padding: 24px 16px;
+    overflow: hidden;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background:
+      radial-gradient(circle at 15% 10%, #ffe4cc 0%, transparent 42%),
+      radial-gradient(circle at 85% 15%, #e0ccf5 0%, transparent 42%),
+      radial-gradient(circle at 75% 85%, #ffd4e0 0%, transparent 45%),
+      radial-gradient(circle at 20% 90%, #cce0f5 0%, transparent 42%),
+      linear-gradient(135deg, #fef8f3 0%, #f5edf8 100%);
+  }
+
+  /* ---------- floating background blobs ---------- */
+  .blob {
+    position: fixed; border-radius: 50%;
+    filter: blur(65px); opacity: 0.55;
+    pointer-events: none; z-index: 0;
+  }
+  .b1 { width: 420px; height: 420px; background: #ffd0b0; top: -140px; left: -120px; animation: drift1 22s ease-in-out infinite; }
+  .b2 { width: 360px; height: 360px; background: #d0b8f0; bottom: -140px; right: -120px; animation: drift2 26s ease-in-out infinite; }
+  .b3 { width: 320px; height: 320px; background: #ffc8d8; top: 50%; left: 72%; animation: drift3 30s ease-in-out infinite; }
+
+  @keyframes drift1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(80px,90px) scale(1.15); } }
+  @keyframes drift2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-90px,-60px) scale(1.2); } }
+  @keyframes drift3 { 0%,100% { transform: translate(-50%,-50%) scale(1); } 50% { transform: translate(-40%,-60%) scale(1.1); } }
+
+  /* ---------- floating feather SVGs ---------- */
+  .feather {
+    position: fixed; pointer-events: none; opacity: 0.6; z-index: 1;
+    animation: sway 16s ease-in-out infinite;
+  }
+  .f1 { top: 7%;  left: 5%;  width: 85px;  --r: -28deg; animation-duration: 14s; }
+  .f2 { bottom: 8%; right: 7%; width: 105px; --r: 38deg;  animation-duration: 18s; animation-direction: reverse; }
+  .f3 { top: 62%; left: 3%;  width: 70px;  --r: -58deg; animation-duration: 20s; }
+  .f4 { top: 10%; right: 10%; width: 78px;  --r: 18deg;  animation-duration: 17s; animation-direction: reverse; }
+
+  @keyframes sway {
+    0%,100% { transform: translateY(0) rotate(var(--r,0deg)); }
+    50%     { transform: translateY(-22px) rotate(calc(var(--r,0deg) + 8deg)); }
+  }
+
+  /* ---------- main calculator panel ---------- */
+  .calculator {
+    position: relative; z-index: 2;
+    width: min(400px, 100%);
+    padding: 22px; border-radius: 44px;
+    background:
+      radial-gradient(circle at 25% 12%, rgba(255,255,255,0.98) 0%, transparent 42%),
+      radial-gradient(circle at 82% 92%, rgba(235,218,250,0.75) 0%, transparent 52%),
+      linear-gradient(155deg, #fefbfe 0%, #f4ebfa 55%, #ead9f3 100%);
+    box-shadow:
+      28px 32px 70px -10px rgba(150,110,180,0.42),
+      48px 58px 130px -22px rgba(150,110,180,0.22),
+      -14px -14px 42px rgba(255,255,255,1),
+      -6px -6px 20px rgba(255,255,255,0.9),
+      inset 3px 3px 8px rgba(255,255,255,1),
+      inset -3px -4px 14px rgba(175,140,200,0.3),
+      inset 0 0 0 1px rgba(255,255,255,0.65);
+    animation: floatIn 0.85s cubic-bezier(0.2,0.9,0.3,1) both;
+  }
+  @keyframes floatIn {
+    from { opacity: 0; transform: translateY(30px) scale(0.95); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .calculator::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+    background-image:
+      repeating-linear-gradient(115deg, transparent 0 4px, rgba(255,255,255,0.4) 4px 5px, transparent 5px 10px),
+      repeating-linear-gradient(65deg, transparent 0 6px, rgba(200,170,220,0.13) 6px 7px);
+    opacity: 0.55; mix-blend-mode: soft-light;
+    -webkit-mask-image: radial-gradient(circle at 30% 18%, #000 0%, transparent 72%);
+    mask-image: radial-gradient(circle at 30% 18%, #000 0%, transparent 72%);
+  }
+
+  /* ---------- display ---------- */
+  .display {
+    display: flex; flex-direction: column; justify-content: flex-end;
+    min-height: 126px; max-height: 200px; overflow-y: auto;
+    padding: 18px 22px; margin-bottom: 20px; border-radius: 26px; text-align: right;
+    background: linear-gradient(160deg, #f0e6f5 0%, #fdf5fb 100%);
+    box-shadow:
+      inset 8px 8px 20px rgba(180,145,205,0.34),
+      inset -6px -6px 16px rgba(255,255,255,0.95),
+      inset 0 0 0 1px rgba(255,255,255,0.55);
+  }
+  .display::-webkit-scrollbar { width: 0; }
+  .expr {
+    font-size: 1rem; min-height: 1.45em; line-height: 1.45;
+    color: #a893bd; letter-spacing: 0.5px; word-break: break-all;
+  }
+  .result {
+    font-size: 2.4rem; font-weight: 600; line-height: 1.2;
+    color: var(--ink); word-break: break-all;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.85), 0 2px 6px rgba(150,110,180,0.25);
+  }
+
+  /* ---------- keypad (4 columns) ---------- */
+  .keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+
+  .key {
+    position: relative; padding: 16px 0; border: none; border-radius: 19px;
+    font-family: inherit; font-size: 1.05rem; font-weight: 600;
+    color: #5a4a6e; cursor: pointer; user-select: none; touch-action: manipulation;
+    background: linear-gradient(165deg, #ffffff 0%, #f8f0fb 45%, #ecdef5 100%);
+    box-shadow:
+      5px 6px 12px rgba(160,120,190,0.35),
+      8px 10px 22px rgba(160,120,190,0.16),
+      -4px -4px 10px rgba(255,255,255,1),
+      -2px -2px 5px rgba(255,255,255,0.9),
+      inset 2px 2px 3px rgba(255,255,255,1),
+      inset -2px -2px 6px rgba(180,145,205,0.22),
+      inset 0 0 0 1px rgba(255,255,255,0.55);
+    transition: box-shadow .18s, transform .09s, background .18s;
+  }
+  .key:hover { background: linear-gradient(165deg, #ffffff 0%, #fbf4fd 45%, #f0e2f8 100%); }
+  .key:active {
+    transform: translateY(2px);
+    background: linear-gradient(165deg, #ecdef5 0%, #f5eaf9 100%);
+    box-shadow:
+      1px 1px 3px rgba(160,120,190,0.3),
+      -1px -1px 3px rgba(255,255,255,0.85),
+      inset 5px 5px 12px rgba(160,120,190,0.38),
+      inset -4px -4px 10px rgba(255,255,255,0.92);
+  }
+
+  .key.num { font-size: 1.25rem; font-weight: 700; color: var(--ink); }
+  .key.fn  { font-size: 0.95rem; color: #3d8a80; background: linear-gradient(165deg, #ffffff 0%, #e8f7f4 45%, #d0ede8 100%); }
+  .key.op  { font-size: 1.35rem; color: #c9603f; background: linear-gradient(165deg, #ffffff 0%, #fdeee6 45%, #f8d9c8 100%); }
+  .key.clear { color: #b85070; background: linear-gradient(165deg, #ffffff 0%, #fceef3 45%, #f8d4e0 100%); }
+
+  .key.equals {
+    grid-column: span 2;                     /* ← makes it span 2 columns */
+    font-size: 1.55rem; font-weight: 800; color: #fff;
+    background: linear-gradient(165deg, #ffb894 0%, #e89bb8 50%, #b894e8 100%);
+    text-shadow: 0 2px 4px rgba(120,70,140,0.4);
+    box-shadow:
+      6px 8px 18px rgba(200,130,170,0.55),
+      10px 13px 32px rgba(160,120,200,0.35),
+      -4px -4px 12px rgba(255,255,255,1),
+      inset 3px 3px 6px rgba(255,255,255,0.7),
+      inset -3px -3px 8px rgba(140,80,160,0.35);
+  }
+  .key.equals:active {
+    background: linear-gradient(165deg, #d89b7c 0%, #c4829e 50%, #9b7cc4 100%);
+    box-shadow:
+      2px 2px 5px rgba(200,130,170,0.5),
+      inset 6px 6px 14px rgba(140,80,160,0.5),
+      inset -4px -4px 10px rgba(255,255,255,0.7);
+  }
+</style>
+</head>
+<body>
+
+<!-- floating blobs -->
+<div class="blob b1"></div>
+<div class="blob b2"></div>
+<div class="blob b3"></div>
+
+<!-- floating feathers -->
+<svg class="feather f1" viewBox="0 0 60 200" style="--r:-28deg">
+  <defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#ffd9c0"/><stop offset="1" stop-color="#e0d4f7"/>
+  </linearGradient></defs>
+  <path d="M30 0 C12 35,6 80,12 1
+  30 C17 165,24 188,30 200 C36 188,43 165,48 130 C54 80,48 35,30 0Z" fill="url(#g1)"/>
+</svg>
+<svg class="feather f2" viewBox="0 0 60 200" style="--r:38deg">
+  <defs><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#e0ccf5"/><stop offset="1" stop-color="#ffd4e0"/>
+  </linearGradient></defs>
+  <path d="M30 0 C12 35,6 80,12 130 C17 165,24 188,30 200 C36 188,43 165,48 130 C54 80,48 35,30 0Z" fill="url(#g2)"/>
+</svg>
+<svg class="feather f3" viewBox="0 0 60 200" style="--r:-58deg">
+  <defs><linearGradient id="g3" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#cce0f5"/><stop offset="1" stop-color="#ffd9c0"/>
+  </linearGradient></defs>
+  <path d="M30 0 C12 35,6 80,12 130 C17 165,24 188,30 200 C36 188,43 165,48 130 C54 80,48 35,30 0Z" fill="url(#g3)"/>
+</svg>
+<svg class="feather f4" viewBox="0 0 60 200" style="--r:18deg">
+  <defs><linearGradient id="g4" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#ffc8d8"/><stop offset="1" stop-color="#d0b8f0"/>
+  </linearGradient></defs>
+  <path d="M30 0 C12 35,6 80,12 130 C17 165,24 188,30 200 C36 188,43 165,48 130 C54 80,48 35,30 0Z" fill="url(#g4)"/>
+</svg>
+
+<!-- ================= CALCULATOR ================= -->
+<div class="calculator">
+  <div class="display">
+    <div class="expr" id="expr"></div>
+    <div class="result" id="result">0</div>
+  </div>
+
+  <div class="keys">
+    <!-- Row 1 -->
+    <button class="key fn clear" onclick="clearAll()">AC</button>
+    <button class="key fn" onclick="press('(')">(</button>
+    <button class="key fn" onclick="press(')')">)</button>
+    <button class="key fn" onclick="backspace()">⌫</button>
+
+    <!-- Row 2 -->
+    <button class="key fn" onclick="press('sin(')">sin</button>
+    <button class="key fn" onclick="press('cos(')">cos</button>
+    <button class="key fn" onclick="press('tan(')">tan</button>
+    <button class="key op" onclick="press('÷')">÷</button>
+
+    <!-- Row 3 -->
+    <button class="key num" onclick="press('7')">7</button>
+    <button class="key num" onclick="press('8')">8</button>
+    <button class="key num" onclick="press('9')">9</button>
+    <button class="key op" onclick="press('×')">×</button>
+
+    <!-- Row 4 -->
+    <button class="key num" onclick="press('4')">4</button>
+    <button class="key num" onclick="press('5')">5</button>
+    <button class="key num" onclick="press('6')">6</button>
+    <button class="key op" onclick="press('-')">−</button>
+
+    <!-- Row 5 -->
+    <button class="key num" onclick="press('1')">1</button>
+    <button class="key num" onclick="press('2')">2</button>
+    <button class="key num" onclick="press('3')">3</button>
+    <button class="key op" onclick="press('+')">+</button>
+
+    <!-- Row 6 -->
+    <button class="key num" onclick="press('0')">0</button>
+    <button class="key num" onclick="press('.')">.</button>
+    <button class="key equals" onclick="equals()">=</button>
+  </div>
+</div>
+
+<script>
+/*VARIABLE  —  the calculator's memory*/
+let expression = "";      // what the user has typed (a string)
+
+/*TRIG FUNCTIONS  —  always work in DEGREES
+   JavaScript's Math.sin/cos/tan only accept RADIANS.
+   So we always convert:  radians = degrees × π / 180*/
+function sin(x) {
+    return Math.sin(x * Math.PI / 180);
+}
+
+function cos(x) {
+    return Math.cos(x * Math.PI / 180);
+}
+
+function tan(x) {
+    return Math.tan(x * Math.PI / 180);
+}
+
+/*press(value) add a value to the expression
+   Every button with onclick="press('...')" runs this function.*/
+function press(value) {
+    expression = expression + value;
+    showOnScreen();
+}
+
+/*showOnScreen()  —  refresh the display*/
+function showOnScreen() {
+    document.getElementById("expr").innerHTML = expression;
+
+    // If nothing typed, show 0 and stop
+    if (expression === "") {
+        document.getElementById("result").innerHTML = "0";
+        return;
+    }
+
+    //Try to show a live preview. If the input is incomplete
+    //(like "sin("), the try fails and the catch shows nothing.
+    try {
+        document.getElementById("result").innerHTML = calculate();
+    } catch (error) {
+        document.getElementById("result").innerHTML = "";
+    }
+}
+
+/*calculate()
+   Steps:
+     1. Copy the expression into a new variable
+     2. Replace calculator symbols with JavaScript symbols
+     3. Use eval() to do the math*/
+function calculate() {
+    let js = expression;
+
+    //Symbol replacement
+    js = js.replace(/×/g, "*");   // ×  →  *
+    js = js.replace(/÷/g, "/");   // ÷  →  /
+
+    //Do the math
+    let answer = eval(js);
+
+    //Round tiny floating-point errors
+    answer = parseFloat(answer.toPrecision(12));
+
+    return answer;
+}
+
+/*BUTTON ACTIONS*/
+
+//AC(clear everything)
+function clearAll() {
+    expression = "";
+    document.getElementById("expr").innerHTML = "";
+    document.getElementById("result").innerHTML = "0";
+}
+
+//remove the last character
+function backspace() {
+    expression = expression.slice(0, -1);
+    showOnScreen();
+}
+
+//show the final answer
+function equals() {
+    if (expression === "") return;
+
+    try {
+        let answer = calculate();
+        document.getElementById("expr").innerHTML = expression + " =";
+        document.getElementById("result").innerHTML = answer;
+        expression = String(answer);   // keep answer for next input
+    } catch (error) {
+        document.getElementById("result").innerHTML = "Error";
+    }
+}
+
+/*KEYBOARD SUPPORT */
+document.addEventListener("keydown", function(event) {
+    let key = event.key;
+
+    if (key >= "0" && key <= "9") {
+        press(key);
+    } else if (key === ".") {
+        press(".");
+    } else if (key === "+" || key === "-") {
+        press(key);
+    } else if (key === "*") {
+        press("×");
+    } else if (key === "/") {
+        press("÷");
+    } else if (key === "(" || key === ")") {
+        press(key);
+    } else if (key === "Enter" || key === "=") {
+        equals();
+    } else if (key === "Backspace") {
+        backspace();
+    } else if (key === "Escape") {
+        clearAll();
+    } else {
+        return;   //unknown key
+    }
+
+    event.preventDefault();
+});
+</script>
+</body>
+</html>
